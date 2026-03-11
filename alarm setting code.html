@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Voltage Alarm Settings - Elban UPG</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#137fec",
+                        "warning": "#facc15",
+                        "danger": "#f43f5e",
+                        "background-light": "#f6f7f8",
+                        "background-dark": "#101922",
+                    },
+                    fontFamily: {
+                        "display": ["Space Grotesk"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+<style type="text/tailwindcss">
+        body {
+            font-family: 'Space Grotesk', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .glass-panel {
+            @apply bg-slate-800/40 backdrop-blur-md border border-white/5;
+        }
+        .ios-switch {
+            @apply relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none;
+        }
+        .ios-switch-dot {
+            @apply inline-block h-5 w-5 transform rounded-full bg-white transition-transform;
+        }
+        .custom-range {
+            @apply w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-primary;
+        }
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-white min-h-screen flex justify-center">
+<div class="w-full max-w-[430px] h-screen max-h-[932px] overflow-hidden flex flex-col bg-background-light dark:bg-background-dark relative shadow-2xl border-x border-slate-200 dark:border-slate-800">
+<div class="h-12 w-full flex justify-between items-center px-8 pt-2">
+<span class="text-sm font-bold">9:41</span>
+<div class="flex items-center gap-1.5">
+<span class="material-icons text-xs">signal_cellular_alt</span>
+<span class="material-icons text-xs">wifi</span>
+<span class="material-icons text-xs rotate-90">battery_full</span>
+</div>
+</div>
+<header class="px-6 py-4 flex items-center gap-4">
+<button class="w-10 h-10 rounded-full bg-slate-800/50 flex items-center justify-center border border-slate-700/50 active:scale-90 transition-transform">
+<span class="material-icons text-slate-300">arrow_back_ios_new</span>
+</button>
+<div>
+<h1 class="text-xl font-bold tracking-tight">Voltage Alarm Settings</h1>
+<p class="text-[10px] uppercase tracking-widest text-primary font-semibold">Elban UPG Config</p>
+</div>
+</header>
+<main class="flex-1 overflow-y-auto px-6 pb-32 no-scrollbar">
+<section class="mt-6">
+<div class="glass-panel p-5 rounded-2xl">
+<div class="flex items-center justify-between mb-6">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-xl bg-danger/10 flex items-center justify-center">
+<span class="material-symbols-outlined text-danger">report_problem</span>
+</div>
+<div>
+<h2 class="text-sm font-bold">High Voltage Alarm</h2>
+<p class="text-[10px] text-slate-400">Trigger alert on surge</p>
+</div>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox" value=""/>
+<div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-danger"></div>
+</label>
+</div>
+<div class="space-y-4">
+<div class="flex justify-between items-end">
+<span class="text-[10px] font-bold text-slate-500 uppercase">Threshold</span>
+<span class="text-2xl font-bold text-danger">245<span class="text-xs ml-1">V</span></span>
+</div>
+<input class="custom-range accent-danger" max="280" min="230" type="range" value="245"/>
+<div class="flex justify-between text-[10px] text-slate-500 font-medium">
+<span>230V</span>
+<span>280V</span>
+</div>
+</div>
+</div>
+</section>
+<section class="mt-6">
+<div class="glass-panel p-5 rounded-2xl">
+<div class="flex items-center justify-between mb-6">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-xl bg-warning/10 flex items-center justify-center">
+<span class="material-symbols-outlined text-warning">warning</span>
+</div>
+<div>
+<h2 class="text-sm font-bold">Low Voltage Alarm</h2>
+<p class="text-[10px] text-slate-400">Trigger alert on sag</p>
+</div>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox" value=""/>
+<div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-warning"></div>
+</label>
+</div>
+<div class="space-y-4">
+<div class="flex justify-between items-end">
+<span class="text-[10px] font-bold text-slate-500 uppercase">Threshold</span>
+<span class="text-2xl font-bold text-warning">205<span class="text-xs ml-1">V</span></span>
+</div>
+<input class="custom-range accent-warning" max="220" min="180" type="range" value="205"/>
+<div class="flex justify-between text-[10px] text-slate-500 font-medium">
+<span>180V</span>
+<span>220V</span>
+</div>
+</div>
+</div>
+</section>
+<section class="mt-6">
+<div class="glass-panel p-5 rounded-2xl">
+<h2 class="text-[10px] font-bold text-slate-500 uppercase mb-4 tracking-widest">Notification Preferences</h2>
+<div class="space-y-4">
+<div class="flex flex-col gap-2">
+<label class="text-xs font-bold text-slate-300">Alarm Sound</label>
+<div class="relative">
+<select class="w-full bg-slate-800/50 border border-slate-700 rounded-xl py-3 px-4 text-sm appearance-none focus:ring-1 focus:ring-primary focus:border-primary">
+<option>Industrial Siren</option>
+<option>Continuous Beep</option>
+<option>Subtle Pulse</option>
+<option>Emergency Alert</option>
+</select>
+<span class="material-icons absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none">expand_more</span>
+</div>
+</div>
+<button class="w-full py-4 border border-primary/30 rounded-xl bg-primary/5 flex items-center justify-center gap-3 active:bg-primary/10 transition-colors">
+<span class="material-icons text-primary text-xl">volume_up</span>
+<span class="text-sm font-bold text-primary">Test Alarm Sound</span>
+</button>
+</div>
+</div>
+</section>
+<div class="mt-6 px-2 flex gap-3 items-start">
+<span class="material-icons text-slate-500 text-sm mt-0.5">info</span>
+<p class="text-[10px] text-slate-400 leading-relaxed">Alarms will trigger push notifications and audible alerts on all connected Elban UPG management devices.</p>
+</div>
+</main>
+<div class="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-background-dark via-background-dark to-transparent">
+<button class="w-full bg-primary hover:bg-primary/90 text-white font-bold py-4 rounded-xl shadow-lg shadow-primary/20 flex items-center justify-center gap-2 transition-all active:scale-[0.98]">
+<span class="material-icons text-lg">save</span>
+<span>Save Changes</span>
+</button>
+</div>
+<div class="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-32 h-1 bg-white/20 rounded-full"></div>
+</div>
+
+</body></html>

@@ -1,0 +1,1954 @@
+<!DOCTYPE html>
+<html class="dark" lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Elban UPG Monitoring Dashboard</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;display=swap"
+        rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet" />
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#137fec",
+                        "critical": "#ef4444",
+                        "healthy": "#10b981",
+                        "background-light": "#f6f7f8",
+                        "background-dark": "#101922",
+                    },
+                    fontFamily: {
+                        "display": ["Space Grotesk"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+    <style type="text/tailwindcss">
+        body {
+            font-family: 'Space Grotesk', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+            min-height: max(884px, 100dvh);
+        }
+        .gauge-container {
+            position: relative;
+            width: 260px;
+            height: 260px;
+        }
+        .gauge-svg {
+            transform: rotate(-90deg);
+        }
+        .gauge-background {
+            fill: none;
+            stroke: #1e293b;
+            stroke-width: 12;
+            stroke-dasharray: 440;
+            stroke-dashoffset: 0;
+            stroke-linecap: round;
+        }
+        .gauge-fill {
+            fill: none;
+            stroke: #137fec;
+            stroke-width: 12;
+            stroke-dasharray: 440;
+            stroke-dashoffset: 140;
+            stroke-linecap: round;
+            filter: drop-shadow(0 0 8px rgba(19, 127, 236, 0.6));
+        }
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.4);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .graph-line {
+            fill: none;
+            stroke: #137fec;
+            stroke-width: 2.5;
+            stroke-linejoin: round;
+            stroke-linecap: round;
+        }
+        .graph-area {
+            fill: url(#graph-gradient);
+            opacity: 0.2;
+        }
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+    <style>
+        body {
+            min-height: max(884px, 100dvh);
+        }
+    </style>
+</head>
+
+<body
+    class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-white min-h-screen flex justify-center">
+    <div
+        class="w-full max-w-[430px] min-h-screen flex flex-col bg-background-light dark:bg-background-dark relative shadow-2xl border-x border-slate-200 dark:border-slate-800">
+        <div id="status-bar" class="h-12 w-full flex justify-between items-center px-8 pt-2 z-10 shrink-0">
+            <span id="current-time" class="text-sm font-bold">9:41</span>
+            <div class="flex items-center gap-1.5">
+                <span id="signal-icon" class="material-icons text-xs">signal_cellular_alt</span>
+                <span id="wifi-icon" class="material-icons text-xs">wifi</span>
+                <span id="battery-icon" class="material-icons text-xs rotate-90">battery_full</span>
+            </div>
+        </div>
+        <header id="main-header" class="px-6 py-2 flex justify-between items-center z-10 shrink-0">
+            <div>
+                <h1 class="text-xl font-bold tracking-tight text-primary">ELBAN <span class="text-slate-200">UPG</span>
+                </h1>
+                <div class="flex flex-col gap-0.5 mt-1">
+                    <div class="flex items-center gap-1.5">
+                        <span id="mqtt-status-dot" class="w-1.5 h-1.5 rounded-full bg-slate-500"></span>
+                        <span id="mqtt-status-text"
+                            class="text-[9px] uppercase tracking-widest text-slate-400 font-semibold">Broker
+                            Offline</span>
+                    </div>
+                    <div class="flex items-center gap-1.5">
+                        <span id="connection-status-dot" class="w-1.5 h-1.5 rounded-full bg-slate-500"></span>
+                        <span id="connection-status-text"
+                            class="text-[9px] uppercase tracking-widest text-slate-400 font-semibold">Device
+                            Offline</span>
+                    </div>
+                </div>
+            </div>
+            <div class="w-10 h-10 rounded-full glass-panel flex items-center justify-center">
+                <span class="material-symbols-outlined text-slate-400 text-xl">notifications</span>
+            </div>
+        </header>
+
+        <!-- History Header (Hidden by default) -->
+        <header id="history-header" class="px-6 py-4 flex justify-between items-center z-10 shrink-0 hidden">
+            <button onclick="showSection('monitoring')"
+                class="w-10 h-10 rounded-full glass-panel flex items-center justify-center">
+                <span class="material-symbols-outlined text-slate-200">chevron_left</span>
+            </button>
+            <div class="text-center">
+                <h1 class="text-lg font-bold tracking-tight text-white">Voltage History</h1>
+                <p class="text-[10px] uppercase tracking-widest text-primary font-bold">ELBAN UPG-402X</p>
+            </div>
+            <button class="w-10 h-10 rounded-full glass-panel flex items-center justify-center">
+                <span class="material-symbols-outlined text-slate-200">ios_share</span>
+            </button>
+        </header>
+
+        <!-- Alarm Header (Hidden by default) -->
+        <header id="alarm-header" class="px-6 py-4 flex items-center gap-4 hidden">
+            <button onclick="showSection('monitoring')"
+                class="w-10 h-10 rounded-full bg-slate-800/50 flex items-center justify-center border border-slate-700/50 active:scale-90 transition-transform">
+                <span class="material-icons text-slate-300">arrow_back_ios_new</span>
+            </button>
+            <div>
+                <h1 class="text-xl font-bold tracking-tight">Voltage Alarm Settings</h1>
+                <p class="text-[10px] uppercase tracking-widest text-primary font-semibold">Elban UPG Config</p>
+            </div>
+        </header>
+
+        <!-- Device Info Header (Hidden by default) -->
+        <header id="device-header" class="px-6 py-4 flex items-center gap-4 hidden">
+            <button onclick="showSection('monitoring')"
+                class="w-10 h-10 rounded-full bg-slate-800/50 flex items-center justify-center border border-slate-700/50 active:scale-90 transition-transform">
+                <span class="material-icons text-slate-300">arrow_back_ios_new</span>
+            </button>
+            <div class="flex-1">
+                <h1 class="text-xl font-bold tracking-tight">Device Information</h1>
+                <p class="text-[10px] uppercase tracking-widest text-primary font-semibold">PZEM-004T &middot; ESP32</p>
+            </div>
+            <button onclick="toggleDeviceEdit()"
+                class="w-10 h-10 rounded-full glass-panel flex items-center justify-center active:scale-95 transition-transform">
+                <span id="device-edit-icon" class="material-symbols-outlined text-slate-300">edit</span>
+            </button>
+        </header>
+        <!-- Monitoring Content -->
+        <main id="monitoring-section" class="flex-1 overflow-y-auto px-6 pb-32 no-scrollbar">
+            <div class="flex flex-col items-center justify-center py-4">
+                <div class="gauge-container">
+                    <svg class="gauge-svg w-full h-full" viewBox="0 0 160 160">
+                        <circle class="gauge-background" cx="80" cy="80" r="70" stroke-dasharray="330"
+                            stroke-dashoffset="-165" style="transform-origin: center; transform: rotate(-45deg);">
+                        </circle>
+                        <circle id="gauge-fill-path" class="gauge-fill" cx="80" cy="80" r="70" stroke-dasharray="330"
+                            stroke-dashoffset="330" style="transform-origin: center; transform: rotate(-45deg);">
+                        </circle>
+                    </svg>
+                    <div class="absolute inset-0 flex flex-col items-center justify-center">
+                        <span id="voltage-display" class="text-6xl font-bold tracking-tighter text-white">0.0</span>
+                        <span class="text-primary font-semibold text-lg tracking-widest mt-1">VOLTS</span>
+                        <div
+                            class="flex items-center gap-2 mt-4 px-3 py-1 bg-primary/10 rounded-full border border-primary/20">
+                            <span class="material-icons text-xs text-primary">bolt</span>
+                            <span class="text-[10px] font-bold text-primary uppercase">Nominal Range</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3 mt-2">
+                <div class="glass-panel p-4 rounded-xl flex items-center gap-3 border-sky-500/10">
+                    <div class="w-10 h-10 rounded-lg bg-sky-500/10 flex items-center justify-center">
+                        <span class="material-symbols-outlined text-sky-400">electric_meter</span>
+                    </div>
+                    <div>
+                        <span class="text-[9px] font-bold text-slate-500 uppercase tracking-tighter">Current</span>
+                        <div class="flex items-baseline gap-1">
+                            <span id="current-main-display" class="text-xl font-bold text-white">0.00</span>
+                            <span class="text-[10px] text-slate-500 font-bold">A</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="glass-panel p-4 rounded-xl flex items-center gap-3 border-emerald-500/10">
+                    <div class="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                        <span class="material-symbols-outlined text-emerald-400">energy_savings_leaf</span>
+                    </div>
+                    <div>
+                        <span class="text-[9px] font-bold text-slate-500 uppercase tracking-tighter">Energy</span>
+                        <div class="flex items-baseline gap-1">
+                            <span id="energy-main-display" class="text-xl font-bold text-white">0.000</span>
+                            <span class="text-[10px] text-slate-500 font-bold">kWh</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="glass-panel p-4 rounded-xl flex items-center gap-3 border-violet-500/10">
+                    <div class="w-10 h-10 rounded-lg bg-violet-500/10 flex items-center justify-center">
+                        <span class="material-symbols-outlined text-violet-400">pulse_alert</span>
+                    </div>
+                    <div>
+                        <span class="text-[9px] font-bold text-slate-500 uppercase tracking-tighter">Freq</span>
+                        <div class="flex items-baseline gap-1">
+                            <span id="freq-main-display" class="text-xl font-bold text-white">0.0</span>
+                            <span class="text-[10px] text-slate-500 font-bold">Hz</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="glass-panel p-4 rounded-xl flex items-center gap-3 border-amber-500/10">
+                    <div class="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center">
+                        <span class="material-symbols-outlined text-amber-400">percent</span>
+                    </div>
+                    <div>
+                        <span class="text-[9px] font-bold text-slate-500 uppercase tracking-tighter">PF</span>
+                        <div class="flex items-baseline gap-1">
+                            <span id="pf-main-display" class="text-xl font-bold text-white">0.00</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="mt-8">
+                <div class="flex justify-between items-end mb-4">
+                    <h2 class="text-sm font-bold uppercase tracking-widest text-slate-400">Current History (A)</h2>
+                    <div class="flex gap-2">
+                        <div
+                            class="flex items-center gap-1.5 px-2 py-0.5 rounded bg-sky-500/20 border border-sky-500/40">
+                            <span class="w-1.5 h-1.5 rounded-full bg-sky-500 animate-pulse"></span>
+                            <span class="text-[10px] font-bold text-sky-500">LIVE</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="glass-panel h-80 rounded-2xl relative overflow-hidden p-0">
+                    <svg id="current-graph-svg" class="w-full h-full" preserveAspectRatio="none" viewBox="0 0 400 240">
+                        <defs>
+                            <linearGradient id="graph-gradient" x1="0%" x2="0%" y1="0%" y2="100%">
+                                <stop offset="0%" style="stop-color: #0ea5e9; stop-opacity: 0.4"></stop>
+                                <stop offset="100%" style="stop-color: #0ea5e9; stop-opacity: 0"></stop>
+                            </linearGradient>
+                        </defs>
+                        <line stroke="rgba(255,255,255,0.05)" stroke-width="1" x1="0" x2="400" y1="40" y2="40"></line>
+                        <line stroke="rgba(255,255,255,0.05)" stroke-width="1" x1="0" x2="400" y1="90" y2="90"></line>
+                        <line stroke="rgba(255,255,255,0.05)" stroke-width="1" x1="0" x2="400" y1="140" y2="140"></line>
+                        <line stroke="rgba(255,255,255,0.05)" stroke-width="1" x1="0" x2="400" y1="190" y2="190"></line>
+
+                        <path id="graph-area-path" class="graph-area" d=""></path>
+                        <path id="graph-line-path" class="graph-line" style="stroke: #0ea5e9" d=""></path>
+
+                        <circle id="graph-cursor" cx="0" cy="240" fill="#0ea5e9" r="4.5" style="display:none"></circle>
+                        <circle id="graph-cursor-glow" cx="0" cy="240" fill="#0ea5e9" opacity="0.3" r="10"
+                            style="display:none"></circle>
+                    </svg>
+                    <div class="absolute top-4 left-3 flex flex-col justify-between h-[180px]">
+                        <span id="graph-y-max" class="text-[9px] text-slate-500 font-bold">10A</span>
+                        <span class="text-[9px] text-slate-500 font-bold">--</span>
+                        <span class="text-[9px] text-slate-500 font-bold">--</span>
+                        <span class="text-[9px] text-slate-500 font-bold">0A</span>
+                    </div>
+                    <div class="absolute bottom-3 left-4 right-4 flex justify-between">
+                        <span class="text-[8px] text-slate-500 font-bold uppercase tracking-wider">History</span>
+                        <span class="text-[8px] text-slate-500 font-bold uppercase tracking-wider">Now</span>
+                    </div>
+                </div>
+                <!-- Power History Graph -->
+                <div class="mt-8">
+                    <div class="flex justify-between items-end mb-4">
+                        <h2 class="text-sm font-bold uppercase tracking-widest text-slate-400">Power History (W)</h2>
+                        <div class="flex gap-2">
+                            <div
+                                class="flex items-center gap-1.5 px-2 py-0.5 rounded bg-amber-500/20 border border-amber-500/40">
+                                <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                                <span class="text-[10px] font-bold text-amber-500">LIVE</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="glass-panel h-64 rounded-2xl relative overflow-hidden p-0">
+                        <svg id="power-graph-svg" class="w-full h-full" preserveAspectRatio="none"
+                            viewBox="0 0 400 240">
+                            <defs>
+                                <linearGradient id="power-graph-gradient" x1="0%" x2="0%" y1="0%" y2="100%">
+                                    <stop offset="0%" style="stop-color: #f59e0b; stop-opacity: 0.4"></stop>
+                                    <stop offset="100%" style="stop-color: #f59e0b; stop-opacity: 0"></stop>
+                                </linearGradient>
+                            </defs>
+                            <line stroke="rgba(255,255,255,0.05)" stroke-width="1" x1="0" x2="400" y1="40" y2="40">
+                            </line>
+                            <line stroke="rgba(255,255,255,0.05)" stroke-width="1" x1="0" x2="400" y1="90" y2="90">
+                            </line>
+                            <line stroke="rgba(255,255,255,0.05)" stroke-width="1" x1="0" x2="400" y1="140" y2="140">
+                            </line>
+                            <line stroke="rgba(255,255,255,0.05)" stroke-width="1" x1="0" x2="400" y1="190" y2="190">
+                            </line>
+
+                            <path id="power-graph-area-path" style="fill: url(#power-graph-gradient); opacity: 0.2;"
+                                d=""></path>
+                            <path id="power-graph-line-path" class="graph-line" style="stroke: #f59e0b" d=""></path>
+
+                            <circle id="power-graph-cursor" cx="0" cy="240" fill="#f59e0b" r="4.5" style="display:none">
+                            </circle>
+                        </svg>
+                        <div class="absolute top-4 left-3 flex flex-col justify-between h-[180px]">
+                            <span id="power-graph-y-max" class="text-[9px] text-slate-500 font-bold">1000W</span>
+                            <span class="text-[9px] text-slate-500 font-bold">--</span>
+                            <span class="text-[9px] text-slate-500 font-bold">--</span>
+                            <span class="text-[9px] text-slate-500 font-bold">0W</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-4 glass-panel rounded-xl p-4 flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
+                            <span class="material-symbols-outlined text-primary text-xl">pulse_alert</span>
+                        </div>
+                        <div>
+                            <p class="text-xs font-bold text-white uppercase tracking-tight">Grid Stability</p>
+                            <p id="frequency-display" class="text-[10px] text-slate-400">Frequency: -- Hz</p>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <p id="pf-display" class="text-xs font-bold text-healthy">PF: --</p>
+                        <p id="power-display" class="text-[10px] text-slate-400">Power: -- W</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Activity Mini Log -->
+            <div class="mt-8">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-sm font-bold uppercase tracking-widest text-slate-400">Recent Activity</h2>
+                    <span class="text-[10px] text-slate-500 font-bold uppercase">5 Latest</span>
+                </div>
+                <div id="mini-log-list" class="space-y-3">
+                    <!-- Mini log items will be injected here -->
+                </div>
+                <button onclick="showSection('history')"
+                    class="w-full mt-4 py-3 border border-slate-700/50 rounded-xl text-[10px] font-bold text-slate-400 uppercase tracking-widest transition-all active:scale-95">
+                    View All History
+                </button>
+            </div>
+    </div>
+    </main>
+
+    <!-- History Content (Hidden by default) -->
+    <main id="history-section" class="flex-1 overflow-y-auto px-6 pb-32 no-scrollbar hidden">
+        <!-- Filter & Actions Bar -->
+        <div class="flex items-center gap-3 py-3 overflow-x-auto no-scrollbar">
+            <!-- Date Filter -->
+            <div class="flex items-center gap-2 glass-panel px-3 py-1.5 rounded-full shrink-0">
+                <span class="material-symbols-outlined text-sm text-slate-500">calendar_month</span>
+                <input type="date" id="history-date-filter" onchange="applyDateFilter(this.value)"
+                    class="bg-transparent border-none text-xs font-bold text-white focus:ring-0 p-0 outline-none cursor-pointer">
+            </div>
+
+            <!-- All History Button -->
+            <button onclick="applyDateFilter('all')"
+                class="filter-btn px-4 py-2 rounded-full glass-panel text-slate-400 text-xs font-bold whitespace-nowrap active:scale-95 transition-all">
+                All History
+            </button>
+
+            <!-- Export CSV -->
+            <button onclick="exportHistoryToCSV()"
+                class="px-4 py-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-500 text-xs font-bold whitespace-nowrap flex items-center gap-1 hover:bg-emerald-500/20 active:scale-95 transition-all">
+                <span class="material-symbols-outlined text-sm">download</span> Export
+            </button>
+
+            <!-- Clear Log -->
+            <button onclick="confirmClearHistory()"
+                class="px-4 py-2 rounded-full border border-red-500/30 bg-red-500/10 text-red-500 text-xs font-bold whitespace-nowrap flex items-center gap-1 hover:bg-red-500/20 active:scale-95 transition-all ml-auto">
+                <span class="material-symbols-outlined text-sm">delete_sweep</span> Clear
+            </button>
+        </div>
+
+        <div class="grid grid-cols-3 gap-3 mt-4">
+            <div class="glass-panel p-3 rounded-xl">
+                <p class="text-[9px] uppercase font-bold text-slate-500">Avg Voltage</p>
+                <p class="text-base font-bold mt-1"><span id="hist-avg-v">--</span><span
+                        class="text-[10px] text-primary ml-0.5">V</span></p>
+            </div>
+            <div class="glass-panel p-3 rounded-xl">
+                <p class="text-[9px] uppercase font-bold text-slate-500">Peak</p>
+                <p class="text-base font-bold mt-1 text-orange-400"><span id="hist-peak-v">--</span><span
+                        class="text-[10px] ml-0.5">V</span>
+                </p>
+            </div>
+            <div onclick="applyAlertFilter()"
+                class="glass-panel p-3 rounded-xl border border-transparent hover:border-red-500/30 active:scale-95 transition-all cursor-pointer group"
+                id="events-card">
+                <p class="text-[9px] uppercase font-bold text-slate-500 group-hover:text-red-400 transition-colors">
+                    Events</p>
+                <p class="text-base font-bold mt-1 text-critical flex items-center justify-between">
+                    <span id="hist-event-count">--</span>
+                    <span
+                        class="material-symbols-outlined text-xs opacity-0 group-hover:opacity-100 transition-opacity">filter_alt</span>
+                </p>
+            </div>
+        </div>
+
+        <!-- Search & Filter Bar -->
+        <div class="flex gap-2 mt-4">
+            <div class="flex-1 glass-panel rounded-xl flex items-center px-4 py-2 gap-3">
+                <span class="material-symbols-outlined text-slate-500 text-lg">search</span>
+                <input type="text" id="log-search-input" oninput="searchLogs(this.value)"
+                    placeholder="Search voltage or time..."
+                    class="bg-transparent border-none text-xs focus:ring-0 p-0 text-slate-300 w-full placeholder:text-slate-600">
+            </div>
+        </div>
+
+        <!-- Log Table Header -->
+        <div class="flex justify-between px-4 mt-6 text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+            <span class="w-1/3">Timestamp</span>
+            <span class="w-1/3 text-center">Reading</span>
+            <span class="w-1/3 text-right">Status</span>
+        </div>
+
+        <!-- Log List -->
+        <div id="history-log-list" class="mt-3 space-y-3">
+        </div>
+
+        <!-- Pagination Toolbar -->
+        <div id="pagination-panel" class="mt-6 flex items-center justify-between px-2">
+            <button onclick="changePage(1)" id="next-btn"
+                class="flex items-center gap-2 px-4 py-2 rounded-xl glass-panel text-[10px] font-bold text-slate-400 disabled:opacity-30 disabled:pointer-events-none transition-all active:scale-95">
+                <span class="material-icons text-sm">history</span> Earlier
+            </button>
+            <div class="text-center group">
+                <p class="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-0.5">Page</p>
+                <p id="current-page-num" class="text-xs font-bold text-white px-3 py-1 bg-slate-800 rounded-lg">1
+                </p>
+            </div>
+            <button onclick="changePage(-1)" id="prev-btn"
+                class="flex items-center gap-2 px-4 py-2 rounded-xl glass-panel text-[10px] font-bold text-slate-400 disabled:opacity-30 disabled:pointer-events-none transition-all active:scale-95">
+                Recent <span class="material-icons text-sm">restore</span>
+            </button>
+        </div>
+
+        <!-- Installation Info Card (Premium Visual based on screen) -->
+        <div class="mt-8 relative rounded-2xl overflow-hidden h-32 group">
+            <div class="absolute inset-0 bg-gradient-to-t from-background-dark to-transparent z-10"></div>
+            <!-- Generate a background pattern/image check -->
+            <div class="absolute inset-0 bg-slate-800 flex items-center justify-center overflow-hidden opacity-50">
+                <svg class="w-full opacity-10" viewBox="0 0 100 100" preserveAspectRatio="none">
+                    <path d="M0,50 Q25,20 50,50 T100,50 T150,50" stroke="#137fec" fill="none" stroke-width="0.5">
+                    </path>
+                    <path d="M0,60 Q25,30 50,60 T100,60 T150,60" stroke="#137fec" fill="none" stroke-width="0.5">
+                    </path>
+                    <path d="M0,70 Q25,40 50,70 T100,70 T150,70" stroke="#137fec" fill="none" stroke-width="0.5">
+                    </path>
+                </svg>
+            </div>
+            <div class="absolute bottom-4 left-5 z-20">
+                <p class="text-[9px] uppercase font-bold text-slate-400 tracking-widest mb-1">Installation Location
+                </p>
+                <div class="flex items-center gap-1.5 pt-4">
+                    <span class="material-symbols-outlined text-[14px] text-slate-500">location_on</span>
+                    <span class="text-[10px] text-slate-300 font-medium">Station 4A - North Grid</span>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Alarm Settings Content (Hidden by default) -->
+    <main id="alarm-section" class="flex-1 overflow-y-auto px-6 pb-32 no-scrollbar hidden">
+        <section class="mt-6">
+            <div class="glass-panel p-5 rounded-2xl">
+                <div class="flex items-center justify-between mb-6">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-critical/10 flex items-center justify-center">
+                            <span class="material-symbols-outlined text-critical">bolt</span>
+                        </div>
+                        <div>
+                            <h2 class="text-sm font-bold">High Voltage Alarm</h2>
+                            <p class="text-[10px] text-slate-400">Trigger alert on surge</p>
+                        </div>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input id="toggle-v-high" checked="" class="sr-only peer" type="checkbox" />
+                        <div
+                            class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-critical">
+                        </div>
+                    </label>
+                </div>
+                <div class="space-y-4">
+                    <div class="flex justify-between items-center">
+                        <span class="text-[10px] font-bold text-slate-500 uppercase">Threshold (V)</span>
+                        <input type="number" id="num-v-high" value="245" step="0.5"
+                            oninput="document.getElementById('range-v-high').value = this.value"
+                            class="w-20 bg-slate-800 border-none rounded-lg text-sm text-right font-bold text-critical p-1 focus:ring-1 focus:ring-critical">
+                    </div>
+                    <input id="range-v-high" oninput="document.getElementById('num-v-high').value = this.value"
+                        class="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-critical"
+                        max="280" min="220" type="range" value="245" />
+                    <div class="flex justify-between text-[10px] text-slate-500 font-medium">
+                        <span>220V</span>
+                        <span>280V</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="mt-4">
+            <div class="glass-panel p-5 rounded-2xl">
+                <div class="flex items-center justify-between mb-6">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center">
+                            <span class="material-symbols-outlined text-amber-500">warning</span>
+                        </div>
+                        <div>
+                            <h2 class="text-sm font-bold">Low Voltage Alarm</h2>
+                            <p class="text-[10px] text-slate-400">Trigger alert on sag</p>
+                        </div>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input id="toggle-v-low" checked="" class="sr-only peer" type="checkbox" />
+                        <div
+                            class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500">
+                        </div>
+                    </label>
+                </div>
+                <div class="space-y-4">
+                    <div class="flex justify-between items-center">
+                        <span class="text-[10px] font-bold text-slate-500 uppercase">Threshold (V)</span>
+                        <input type="number" id="num-v-low" value="205" step="0.5"
+                            oninput="document.getElementById('range-v-low').value = this.value"
+                            class="w-20 bg-slate-800 border-none rounded-lg text-sm text-right font-bold text-amber-500 p-1 focus:ring-1 focus:ring-amber-500">
+                    </div>
+                    <input id="range-v-low" oninput="document.getElementById('num-v-low').value = this.value"
+                        class="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-amber-500"
+                        max="220" min="180" type="range" value="205" />
+                    <div class="flex justify-between text-[10px] text-slate-500 font-medium">
+                        <span>180V</span>
+                        <span>220V</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="mt-4">
+            <div class="glass-panel p-5 rounded-2xl">
+                <div class="flex items-center justify-between mb-6">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-sky-500/10 flex items-center justify-center">
+                            <span class="material-symbols-outlined text-sky-500">electric_meter</span>
+                        </div>
+                        <div>
+                            <h2 class="text-sm font-bold">Overcurrent Alarm</h2>
+                            <p class="text-[10px] text-slate-400">Trigger on high current load</p>
+                        </div>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input id="toggle-c-high" checked="" class="sr-only peer" type="checkbox" />
+                        <div
+                            class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-sky-500">
+                        </div>
+                    </label>
+                </div>
+                <div class="space-y-4">
+                    <div class="flex justify-between items-center">
+                        <span class="text-[10px] font-bold text-slate-500 uppercase">Threshold (A)</span>
+                        <input type="number" id="num-c-high" value="10" step="0.1"
+                            oninput="document.getElementById('range-c-high').value = this.value"
+                            class="w-20 bg-slate-800 border-none rounded-lg text-sm text-right font-bold text-sky-500 p-1 focus:ring-1 focus:ring-sky-500">
+                    </div>
+                    <input id="range-c-high" oninput="document.getElementById('num-c-high').value = this.value"
+                        class="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-sky-500"
+                        max="60" min="1" type="range" value="10" />
+                    <div class="flex justify-between text-[10px] text-slate-500 font-medium">
+                        <span>1A</span>
+                        <span>60A</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="mt-4">
+            <div class="glass-panel p-5 rounded-2xl">
+                <div class="flex items-center justify-between mb-6">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                            <span class="material-symbols-outlined text-primary">speed</span>
+                        </div>
+                        <div>
+                            <h2 class="text-sm font-bold">Power Usage Alarm</h2>
+                            <p class="text-[10px] text-slate-400">Alert on high consumption</p>
+                        </div>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input id="toggle-p-high" checked="" class="sr-only peer" type="checkbox" />
+                        <div
+                            class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary">
+                        </div>
+                    </label>
+                </div>
+                <div class="space-y-4">
+                    <div class="flex justify-between items-center">
+                        <span class="text-[10px] font-bold text-slate-500 uppercase">Threshold (W)</span>
+                        <input type="number" id="num-p-high" value="2000" step="50"
+                            oninput="document.getElementById('range-p-high').value = this.value"
+                            class="w-20 bg-slate-800 border-none rounded-lg text-sm text-right font-bold text-primary p-1 focus:ring-1 focus:ring-primary">
+                    </div>
+                    <input id="range-p-high" oninput="document.getElementById('num-p-high').value = this.value"
+                        class="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-primary"
+                        max="5000" min="50" step="10" type="range" value="2000" />
+                    <div class="flex justify-between text-[10px] text-slate-500 font-medium">
+                        <span>50W</span>
+                        <span>5000W</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="mt-4">
+            <div class="glass-panel p-5 rounded-2xl">
+                <div class="flex items-center justify-between mb-6">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
+                            <span class="material-symbols-outlined text-emerald-500">database</span>
+                        </div>
+                        <div>
+                            <h2 class="text-sm font-bold">Database Logging</h2>
+                            <p class="text-[10px] text-slate-400">Manage data recording</p>
+                        </div>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input id="toggle-db-save" checked="" class="sr-only peer" type="checkbox" />
+                        <div
+                            class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500">
+                        </div>
+                    </label>
+                </div>
+                <div class="space-y-4">
+                    <div class="flex justify-between items-center">
+                        <span class="text-[10px] font-bold text-slate-500 uppercase">Save Interval (s)</span>
+                        <input type="number" id="num-db-interval" value="10" step="1"
+                            oninput="document.getElementById('range-db-interval').value = this.value"
+                            class="w-20 bg-slate-800 border-none rounded-lg text-sm text-right font-bold text-emerald-500 p-1 focus:ring-1 focus:ring-emerald-500">
+                    </div>
+                    <input id="range-db-interval"
+                        oninput="document.getElementById('num-db-interval').value = this.value"
+                        class="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                        max="300" min="5" type="range" value="10" />
+                    <div class="flex justify-between text-[10px] text-slate-500 font-medium">
+                        <span>5s</span>
+                        <span>300s</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="mt-6">
+            <div class="glass-panel p-5 rounded-2xl">
+                <h2 class="text-[10px] font-bold text-slate-500 uppercase mb-4 tracking-widest">Notification
+                    Preferences</h2>
+                <div class="space-y-4">
+                    <div class="flex flex-col gap-2">
+                        <label class="text-xs font-bold text-slate-300">Alarm Sound</label>
+                        <div class="relative">
+                            <select id="alarm-sound-select" onchange="changeAlarmSound(this.value)"
+                                class="w-full bg-slate-800/50 border border-slate-700 rounded-xl py-3 px-4 text-sm appearance-none focus:ring-1 focus:ring-primary focus:border-primary text-white">
+                                <option value="https://assets.mixkit.co/active_storage/sfx/1000/1000-preview.mp3">
+                                    Industrial Siren</option>
+                                <option value="https://assets.mixkit.co/active_storage/sfx/997/997-preview.mp3">
+                                    Rapid Beep</option>
+                                <option value="https://assets.mixkit.co/active_storage/sfx/2190/2190-preview.mp3">
+                                    Emergency Tone</option>
+                                <option value="https://assets.mixkit.co/active_storage/sfx/1006/1006-preview.mp3">
+                                    High Pitch Pulse</option>
+                            </select>
+                            <span
+                                class="material-icons absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none">expand_more</span>
+                        </div>
+                    </div>
+                    <button onclick="testAlarmSound()"
+                        class="w-full py-4 border border-primary/30 rounded-xl bg-primary/5 flex items-center justify-center gap-3 active:bg-primary/10 transition-colors">
+                        <span id="test-alarm-icon" class="material-icons text-primary text-xl">volume_up</span>
+                        <span id="test-alarm-text" class="text-sm font-bold text-primary">Test Alarm Sound</span>
+                    </button>
+                    <audio id="alarm-audio" loop>
+                        <source src="https://assets.mixkit.co/active_storage/sfx/1000/1000-preview.mp3"
+                            type="audio/mpeg">
+                    </audio>
+                </div>
+            </div>
+        </section>
+        <div class="mt-6 px-2 flex gap-3 items-start">
+            <span class="material-icons text-slate-500 text-sm mt-0.5">info</span>
+            <p class="text-[10px] text-slate-400 leading-relaxed">Alarms will trigger push notifications and audible
+                alerts on all connected Elban UPG management devices.</p>
+        </div>
+        <div class="mt-8">
+            <button onclick="saveAlarmSettings(this)"
+                class="w-full bg-primary hover:bg-primary/90 text-white font-bold py-4 rounded-xl shadow-lg shadow-primary/20 flex items-center justify-center gap-2 transition-all active:scale-[0.98]">
+                <span class="material-icons text-lg">save</span>
+                <span>Save Changes</span>
+            </button>
+        </div>
+    </main>
+
+    <!-- Device Info Content (Hidden by default) -->
+    <main id="device-section" class="flex-1 overflow-y-auto px-6 pb-32 no-scrollbar hidden">
+        <!-- Device View Mode -->
+        <div id="device-view-mode">
+            <!-- Connection Card -->
+            <div class="mt-4 glass-panel rounded-2xl p-5">
+                <div class="flex items-center gap-3 mb-4">
+                    <div class="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                        <span class="material-symbols-outlined text-primary">sensors</span>
+                    </div>
+                    <div>
+                        <p id="ui-device-name" class="text-sm font-bold">PZEM-004T v3.0</p>
+                        <p id="ui-device-model" class="text-[10px] text-slate-400">Energy Measurement Module</p>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="bg-slate-800/50 rounded-xl p-3">
+                        <p class="text-[9px] font-bold uppercase text-slate-500 tracking-widest">Broker</p>
+                        <p id="ui-broker"
+                            class="text-xs font-bold text-white mt-1 uppercase tracking-tight overflow-hidden text-ellipsis">
+                            broker.hivemq.com</p>
+                    </div>
+                    <div class="bg-slate-800/50 rounded-xl p-3">
+                        <p class="text-[9px] font-bold uppercase text-slate-500 tracking-widest">Topic</p>
+                        <p id="ui-topic" class="text-xs font-bold text-white mt-1 overflow-hidden text-ellipsis italic">
+                            elban/voltage/data</p>
+                    </div>
+                    <div class="bg-slate-800/50 rounded-xl p-3">
+                        <p class="text-[9px] font-bold uppercase text-slate-500 tracking-widest">Port</p>
+                        <p id="ui-port" class="text-xs font-bold text-white mt-1 uppercase tracking-tighter">8000
+                            (WS)
+                        </p>
+                    </div>
+                    <div class="bg-slate-800/50 rounded-xl p-3">
+                        <p class="text-[9px] font-bold uppercase text-slate-500 tracking-widest">Update Int</p>
+                        <p id="ui-interval" class="text-xs font-bold text-white mt-1 uppercase tracking-tighter">2s
+                        </p>
+                    </div>
+                    <div class="bg-slate-800/50 rounded-xl p-3">
+                        <p class="text-[9px] font-bold uppercase text-slate-500 tracking-widest">Log Int</p>
+                        <p id="ui-log-interval" class="text-xs font-bold text-white mt-1 uppercase tracking-tighter">10s
+                        </p>
+                    </div>
+                    <div class="bg-slate-800/50 rounded-xl p-3">
+                        <p class="text-[9px] font-bold uppercase text-slate-500 tracking-widest">Auto Save</p>
+                        <p id="ui-auto-save-status" class="text-xs font-bold text-emerald-500 mt-1">ENABLED</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Device Edit Mode (Hidden) -->
+        <div id="device-edit-mode" class="mt-4 space-y-4 hidden">
+            <div class="glass-panel rounded-2xl p-5 space-y-4">
+                <h3 class="text-xs font-bold text-primary uppercase tracking-widest">Edit Device Settings</h3>
+
+                <div class="space-y-1.5">
+                    <label class="text-[10px] font-bold text-slate-500 uppercase ml-1">Device Name</label>
+                    <input type="text" id="edit-device-name" value="PZEM-004T v3.0"
+                        class="w-full bg-slate-900/50 border border-slate-700 rounded-xl py-3 px-4 text-sm focus:ring-1 focus:ring-primary focus:border-primary text-white">
+                </div>
+
+                <div class="grid grid-cols-1 gap-4">
+                    <div class="space-y-1.5">
+                        <label class="text-[10px] font-bold text-slate-500 uppercase ml-1">MQTT Broker</label>
+                        <input type="text" id="edit-broker" value="broker.hivemq.com"
+                            class="w-full bg-slate-900/50 border border-slate-700 rounded-xl py-3 px-4 text-sm focus:ring-1 focus:ring-primary focus:border-primary text-white">
+                    </div>
+                    <div class="space-y-1.5">
+                        <label class="text-[10px] font-bold text-slate-500 uppercase ml-1">MQTT Topic</label>
+                        <input type="text" id="edit-topic" value="elban/voltage/data"
+                            class="w-full bg-slate-900/50 border border-slate-700 rounded-xl py-3 px-4 text-sm focus:ring-1 focus:ring-primary focus:border-primary text-white">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-3 gap-3">
+                    <div class="space-y-1.5">
+                        <label class="text-[10px] font-bold text-slate-500 uppercase ml-1">Port</label>
+                        <input type="number" id="edit-port" value="8000"
+                            class="w-full bg-slate-900/50 border border-slate-700 rounded-xl py-3 px-4 text-sm focus:ring-1 focus:ring-primary focus:border-primary text-white">
+                    </div>
+                    <div class="space-y-1.5">
+                        <label class="text-[10px] font-bold text-slate-500 uppercase ml-1">Upd (s)</label>
+                        <input type="number" id="edit-interval" value="2"
+                            class="w-full bg-slate-900/50 border border-slate-700 rounded-xl py-3 px-4 text-sm focus:ring-1 focus:ring-primary focus:border-primary text-white">
+                    </div>
+                    <div class="space-y-1.5">
+                        <label class="text-[10px] font-bold text-slate-500 uppercase ml-1">Log (s)</label>
+                        <input type="number" id="edit-log-interval" value="10"
+                            class="w-full bg-slate-900/50 border border-slate-700 rounded-xl py-3 px-4 text-sm focus:ring-1 focus:ring-primary focus:border-primary text-white">
+                    </div>
+                </div>
+
+                <!-- Auto Save Toggle Edit -->
+                <div
+                    class="flex items-center justify-between glass-panel p-4 rounded-xl mt-2 border border-emerald-500/10">
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                            <span class="material-symbols-outlined text-emerald-500 text-lg">save</span>
+                        </div>
+                        <div>
+                            <p class="text-xs font-bold text-white uppercase tracking-tight">Auto Save Log</p>
+                            <p class="text-[9px] text-slate-500 uppercase font-medium">Record into database</p>
+                        </div>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="edit-auto-save" checked class="sr-only peer">
+                        <div
+                            class="w-10 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500">
+                        </div>
+                    </label>
+                </div>
+
+                <div class="flex gap-3 pt-4">
+                    <button onclick="toggleDeviceEdit()"
+                        class="flex-1 py-3 border border-slate-700 rounded-xl text-xs font-bold text-slate-400 active:scale-95 transition-transform">Cancel</button>
+                    <button onclick="saveDeviceConfig(this)"
+                        class="flex-1 py-3 bg-primary text-white rounded-xl text-xs font-bold shadow-lg shadow-primary/20 active:scale-95 transition-transform">Save
+                        Info</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Live Measurements -->
+        <div class="mt-6">
+            <p class="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-3">Live Measurements</p>
+            <div class="space-y-3">
+                <div class="glass-panel rounded-xl p-4 flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <span class="material-symbols-outlined text-primary text-xl">bolt</span>
+                        <p class="text-sm font-bold">Voltage</p>
+                    </div>
+                    <p id="dev-voltage" class="text-xl font-bold text-white">-- <span
+                            class="text-xs text-slate-400 font-normal">V</span></p>
+                </div>
+                <div class="glass-panel rounded-xl p-4 flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <span class="material-symbols-outlined text-sky-400 text-xl">electric_meter</span>
+                        <p class="text-sm font-bold">Current</p>
+                    </div>
+                    <p id="dev-current" class="text-xl font-bold text-white">-- <span
+                            class="text-xs text-slate-400 font-normal">A</span></p>
+                </div>
+                <div class="glass-panel rounded-xl p-4 flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <span class="material-symbols-outlined text-orange-400 text-xl">power</span>
+                        <p class="text-sm font-bold">Active Power</p>
+                    </div>
+                    <p id="dev-power" class="text-xl font-bold text-white">-- <span
+                            class="text-xs text-slate-400 font-normal">W</span></p>
+                </div>
+                <div class="glass-panel rounded-xl p-4 flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <span class="material-symbols-outlined text-emerald-400 text-xl">energy_savings_leaf</span>
+                        <p class="text-sm font-bold">Energy</p>
+                    </div>
+                    <p id="dev-energy" class="text-xl font-bold text-white">-- <span
+                            class="text-xs text-slate-400 font-normal">kWh</span></p>
+                </div>
+                <div class="glass-panel rounded-xl p-4 flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <span class="material-symbols-outlined text-violet-400 text-xl">pulse_alert</span>
+                        <p class="text-sm font-bold">Frequency</p>
+                    </div>
+                    <p id="dev-frequency" class="text-xl font-bold text-white">-- <span
+                            class="text-xs text-slate-400 font-normal">Hz</span></p>
+                </div>
+                <div class="glass-panel rounded-xl p-4 flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <span class="material-symbols-outlined text-yellow-400 text-xl">percent</span>
+                        <p class="text-sm font-bold">Power Factor</p>
+                    </div>
+                    <p id="dev-pf" class="text-xl font-bold text-white">--</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Last Updated -->
+        <div class="mt-6 text-center">
+            <p class="text-[10px] text-slate-500">Last updated: <span id="last-updated">Never</span></p>
+        </div>
+    </main>
+
+    <!-- Navigation Bar -->
+    <div class="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] z-20 px-4 pb-4">
+        <nav
+            class="glass-panel border-t border-slate-800/50 rounded-2xl pb-2 pt-3 px-2 flex justify-around items-center bg-slate-900/90 shadow-[0_-10px_20px_rgba(0,0,0,0.5)]">
+            <button onclick="showSection('monitoring')" id="nav-monitor"
+                class="flex flex-col items-center gap-1 group w-1/4 transition-all">
+                <span class="material-symbols-outlined text-primary scale-110 text-xl">monitoring</span>
+                <span class="text-[8px] font-bold text-primary uppercase tracking-tighter">Monitor</span>
+            </button>
+            <button onclick="showSection('history')" id="nav-history"
+                class="flex flex-col items-center gap-1 group w-1/4 transition-all">
+                <span
+                    class="material-symbols-outlined text-slate-500 group-hover:text-slate-300 text-xl transition-colors">history</span>
+                <span
+                    class="text-[8px] font-bold text-slate-500 group-hover:text-slate-300 uppercase tracking-tighter transition-colors">History</span>
+            </button>
+            <button onclick="showSection('alarm')" id="nav-alarm"
+                class="flex flex-col items-center gap-1 group w-1/4 transition-all">
+                <span
+                    class="material-symbols-outlined text-slate-500 group-hover:text-slate-300 text-xl transition-colors">notifications_active</span>
+                <span
+                    class="text-[8px] font-bold text-slate-500 group-hover:text-slate-300 uppercase tracking-tighter transition-colors text-center">Settings</span>
+            </button>
+            <button onclick="showSection('device')" id="nav-device"
+                class="flex flex-col items-center gap-1 group w-1/4 transition-all">
+                <span
+                    class="material-symbols-outlined text-slate-500 group-hover:text-slate-300 text-xl transition-colors">device_hub</span>
+                <span
+                    class="text-[8px] font-bold text-slate-500 group-hover:text-slate-300 uppercase tracking-tighter transition-colors">Device</span>
+            </button>
+        </nav>
+        <!-- iOS style home indicator -->
+        <div class="mt-2 mx-auto w-24 h-1 bg-white/5 rounded-full"></div>
+    </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"
+        type="text/javascript"></script>
+    <script>
+        // --- Status Bar Functionality ---
+        function updateClock() {
+            const now = new Date();
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const timeEl = document.getElementById('current-time');
+            if (timeEl) timeEl.innerText = `${hours}:${minutes}`;
+        }
+
+        function updateNetworkStatus() {
+            const wifiIcon = document.getElementById('wifi-icon');
+            const signalIcon = document.getElementById('signal-icon');
+            if (!wifiIcon || !signalIcon) return;
+
+            if (navigator.onLine) {
+                wifiIcon.style.color = "";
+                signalIcon.style.color = "";
+                wifiIcon.innerText = "wifi";
+            } else {
+                wifiIcon.style.color = "#ef4444";
+                wifiIcon.innerText = "wifi_off";
+                signalIcon.style.color = "#ef4444";
+            }
+        }
+
+        setInterval(updateClock, 1000);
+        updateClock();
+        updateNetworkStatus();
+        window.addEventListener('online', updateNetworkStatus);
+        window.addEventListener('offline', updateNetworkStatus);
+        // --- End Status Bar ---
+
+        // --- Global State & Configuration ---
+        const historyLogs = [];
+        const realtimeLogs = [];
+        const currentDataPoints = [];
+        const powerDataPoints = [];
+        const MAX_POINTS = 20;
+
+        let alarmActive = false;
+        let alarmSettings = {
+            vHigh: 245,
+            vLow: 205,
+            cHigh: 10,
+            pHigh: 2000,
+            vHighEnabled: true,
+            vLowEnabled: true,
+            cHighEnabled: true,
+            pHighEnabled: true,
+            soundUrl: "https://assets.mixkit.co/active_storage/sfx/1000/1000-preview.mp3"
+        };
+
+        const MAX_HISTORY_ITEMS = 5000;
+        let persistentHistory = JSON.parse(localStorage.getItem('elban_sensor_history') || '[]');
+        let currentFilter = 'latest';
+        let currentPage = 1;
+        const itemsPerPage = 20;
+
+        // MQTT Configuration
+        const MQTT_BROKER = "broker.hivemq.com";
+        const MQTT_PORT = 8000;
+        const MQTT_TOPIC_DATA = "elban/voltage/data";
+        const MQTT_TOPIC_STATUS = "elban/status";
+        const CLIENT_ID = "ELBAN_DASHBOARD_" + Math.random().toString(16).substr(2, 8);
+
+        const client = new Paho.MQTT.Client(MQTT_BROKER, MQTT_PORT, "/mqtt", CLIENT_ID);
+
+        function connectToBroker() {
+            client.connect({
+                onSuccess: onConnect,
+                onFailure: (err) => {
+                    updateMQTTStatus(false, "Broker Failed");
+                    console.error(err);
+                    setTimeout(connectToBroker, 5000);
+                },
+                useSSL: false,
+                timeout: 10
+            });
+        }
+
+        function getFilteredHistory(filterType) {
+            const now = new Date();
+            let filtered = [...persistentHistory];
+
+            if (filterType === 'all') {
+                // Return all
+            } else if (filterType === 'alerts_only') {
+                filtered = filtered.filter(item => item.voltage < 205 || item.voltage > 245);
+            } else if (filterType === 'today') {
+                const todayStr = now.toDateString();
+                filtered = filtered.filter(item => new Date(item.timestamp).toDateString() === todayStr);
+            } else if (filterType && filterType.includes('-')) {
+                // Treat as date string (YYYY-MM-DD)
+                const targetDate = new Date(filterType).toDateString();
+                filtered = filtered.filter(item => new Date(item.timestamp).toDateString() === targetDate);
+            }
+
+            return filtered.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        }
+
+        function loadHistoryFromDB(filterType = 'latest', page = 1) {
+            filterType = filterType || currentFilter;
+            currentFilter = filterType;
+            currentPage = page;
+
+            const filtered = getFilteredHistory(filterType);
+            const totalItems = filtered.length;
+            const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
+
+            if (page > totalPages) page = totalPages;
+            if (page < 1) page = 1;
+            currentPage = page;
+
+            const startIdx = (page - 1) * itemsPerPage;
+            const pageItems = filtered.slice(startIdx, startIdx + itemsPerPage);
+
+            // Calculate Summaries for the filtered range
+            let totalV = 0;
+            let peakV = 0;
+            let alerts = 0;
+
+            filtered.forEach(item => {
+                totalV += item.voltage;
+                if (item.voltage > peakV) peakV = item.voltage;
+                if (item.voltage < 205 || item.voltage > 245) alerts++;
+            });
+
+            const avgV = filtered.length > 0 ? (totalV / filtered.length).toFixed(1) : "--";
+            const peakStr = filtered.length > 0 ? peakV.toFixed(1) : "--";
+
+            document.getElementById('hist-avg-v').innerText = avgV;
+            document.getElementById('hist-peak-v').innerText = peakStr;
+            document.getElementById('hist-event-count').innerText = alerts;
+
+            // Update Global Logs for UI
+            historyLogs.length = 0;
+            pageItems.forEach(item => {
+                const v = item.voltage;
+                const status = (v < 205 || v > 245) ? "ALERT" : "NORMAL";
+                const color = (v < 205 || v > 245) ? "red-500" : "emerald-500";
+
+                const timeStr = new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+                const dateStr = new Date(item.timestamp).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+
+                historyLogs.push({
+                    time: timeStr,
+                    date: dateStr,
+                    voltage: v.toFixed(1),
+                    status: status,
+                    borderColor: color
+                });
+            });
+
+            // Update Trends (Always based on latest records)
+            const latestForTrends = [...persistentHistory].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)).slice(-20);
+            currentDataPoints.length = 0;
+            powerDataPoints.length = 0;
+            latestForTrends.forEach(item => {
+                currentDataPoints.push(item.current || 0);
+                powerDataPoints.push(item.power || 0);
+            });
+            drawCurrentGraph();
+            drawPowerGraph();
+
+            // UI Updates
+            const pageNumEl = document.getElementById('current-page-num');
+            if (pageNumEl) pageNumEl.innerText = page;
+
+            const prevBtn = document.getElementById('prev-btn');
+            if (prevBtn) prevBtn.disabled = (page === 1);
+
+            const nextBtn = document.getElementById('next-btn');
+            if (nextBtn) nextBtn.disabled = (page >= totalPages);
+
+            updateLogUI();
+            console.log(`History Loaded: ${totalItems} total, Page ${page}/${totalPages}, Filter: ${filterType}`);
+        }
+
+        function exportHistoryToCSV() {
+            if (persistentHistory.length === 0) {
+                alert("No history data to export.");
+                return;
+            }
+
+            let csvContent = "Timestamp,Voltage(V),Current(A),Power(W),Energy(kWh)\n";
+            persistentHistory.forEach(item => {
+                csvContent += `${item.timestamp},${item.voltage},${item.current || 0},${item.power || 0},${item.energy || 0}\n`;
+            });
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.setAttribute("href", url);
+            link.setAttribute("download", `elban_history_${new Date().toISOString().split('T')[0]}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function changePage(delta) {
+            loadHistoryFromDB(currentFilter, currentPage + delta);
+        }
+
+        function applyAlertFilter() {
+            const card = document.getElementById('events-card');
+            if (currentFilter === 'alerts_only') {
+                // Toggle off
+                card.classList.remove('bg-red-500/10', 'border-red-500/40');
+                applyDateFilter('all');
+            } else {
+                // Toggle on
+                document.querySelectorAll('.glass-panel').forEach(p => p.classList.remove('bg-red-500/10', 'border-red-500/40'));
+                card.classList.add('bg-red-500/10', 'border-red-500/40');
+                loadHistoryFromDB('alerts_only', 1);
+            }
+        }
+
+        function applyDateFilter(filter) {
+            // Update UI
+            const dateInput = document.getElementById('history-date-filter');
+            if (filter === 'all' && dateInput) dateInput.value = "";
+
+            // Remove alert highlight if switching to date
+            document.getElementById('events-card').classList.remove('bg-red-500/10', 'border-red-500/40');
+
+            loadHistoryFromDB(filter, 1);
+        }
+
+        function confirmClearHistory() {
+            if (confirm("Are you sure you want to delete all history logs? This action cannot be undone.")) {
+                persistentHistory = [];
+                localStorage.setItem('elban_sensor_history', JSON.stringify([]));
+                loadHistoryFromDB('all', 1);
+                alert("History cleared successfully.");
+            }
+        }
+
+        function searchLogs(val) {
+            const query = val.toLowerCase();
+            const filtered = historyLogs.filter(log =>
+                log.voltage.toString().includes(query) ||
+                log.time.toLowerCase().includes(query) ||
+                log.date.toLowerCase().includes(query)
+            );
+
+            const list = document.getElementById('history-log-list');
+            if (!list) return;
+
+            list.innerHTML = filtered.map(log => `
+                <div class="glass-panel p-4 rounded-xl flex items-center justify-between border-l-4 border-${log.borderColor}">
+                    <div class="w-1/3">
+                        <p class="text-xs font-bold text-white">${log.time}</p>
+                        <p class="text-[9px] text-slate-500 font-medium">${log.date}</p>
+                    </div>
+                    <div class="w-1/3 text-center">
+                        <p class="text-sm font-bold text-white">${log.voltage} <span class="text-[10px] text-slate-500 font-normal">V</span></p>
+                    </div>
+                    <div class="w-1/3 flex justify-end">
+                        <span class="px-3 py-1 bg-${log.borderColor}/10 rounded-full border border-${log.borderColor}/20 text-[9px] font-bold text-${log.borderColor}">${log.status}</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Initial load will happen in DOMContentLoaded to ensure elements and global state are ready
+
+        function onConnect() {
+            console.log("Connected to MQTT Broker: " + MQTT_BROKER);
+            updateMQTTStatus(true, "Broker Connected");
+            client.subscribe(MQTT_TOPIC_DATA);
+            client.subscribe(MQTT_TOPIC_STATUS);
+        }
+
+        function onConnectionLost(responseObject) {
+            if (responseObject.errorCode !== 0) {
+                console.log("Connection lost: " + responseObject.errorMessage);
+                updateMQTTStatus(false, "Broker Offline");
+                updateStatus(false);
+                setTimeout(connectToBroker, 5000); // Try to reconnect
+            }
+        }
+
+        function onMessageArrived(message) {
+            if (message.destinationName === MQTT_TOPIC_DATA) {
+                try {
+                    const data = JSON.parse(message.payloadString);
+                    updateUI(data);
+                    updateStatus(true);
+                } catch (e) {
+                    console.error("Error parsing JSON:", e);
+                }
+            } else if (message.destinationName === MQTT_TOPIC_STATUS) {
+                updateStatus(message.payloadString === "online");
+            }
+        }
+
+        function updateMQTTStatus(isConnected, message) {
+            const dot = document.getElementById('mqtt-status-dot');
+            const text = document.getElementById('mqtt-status-text');
+            if (isConnected) {
+                dot.className = "w-1.5 h-1.5 rounded-full bg-sky-500 shadow-[0_0_5px_rgba(14,165,233,0.5)]";
+                text.innerText = message || "Broker Connected";
+                text.className = "text-[9px] uppercase tracking-widest text-sky-500 font-bold";
+            } else {
+                dot.className = "w-1.5 h-1.5 rounded-full bg-slate-500";
+                text.innerText = message || "Broker Offline";
+                text.className = "text-[9px] uppercase tracking-widest text-slate-400 font-semibold";
+            }
+        }
+
+        function updateStatus(isOnline) {
+            const dot = document.getElementById('connection-status-dot');
+            const text = document.getElementById('connection-status-text');
+
+            if (isOnline) {
+                dot.className = "w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse";
+                text.innerText = "Device Connected";
+                text.className = "text-[9px] uppercase tracking-widest text-emerald-500 font-bold";
+            } else {
+                dot.className = "w-1.5 h-1.5 rounded-full bg-slate-500";
+                text.innerText = "Device Offline";
+                text.className = "text-[9px] uppercase tracking-widest text-slate-400 font-semibold";
+            }
+        }
+
+
+
+        function changeAlarmSound(url) {
+            const audio = document.getElementById('alarm-audio');
+            const wasPlaying = !audio.paused;
+            audio.src = url;
+            if (wasPlaying) audio.play();
+            alarmSettings.soundUrl = url;
+        }
+
+        function testAlarmSound() {
+            const audio = document.getElementById('alarm-audio');
+            const btnText = document.getElementById('test-alarm-text');
+            const btnIcon = document.getElementById('test-alarm-icon');
+
+            if (audio.paused) {
+                audio.play().then(() => {
+                    btnText.innerText = "Stop Test";
+                    btnIcon.innerText = "volume_off";
+                }).catch(e => {
+                    if (e.name === 'NotAllowedError') {
+                        alert("Silakan klik di mana saja pada halaman terlebih dahulu untuk mengaktifkan suara alarm.");
+                    } else if (e.name !== 'AbortError') {
+                        console.error("Audio Playback Error:", e);
+                    }
+                });
+            } else {
+                audio.pause();
+                audio.currentTime = 0;
+                btnText.innerText = "Test Alarm Sound";
+                btnIcon.innerText = "volume_up";
+            }
+        }
+
+        let audioPromise = null;
+        function triggerAlarm(shouldPlay, reason = "") {
+            const audio = document.getElementById('alarm-audio');
+            const mainHeader = document.getElementById('main-header');
+
+            if (shouldPlay) {
+                if (!alarmActive) {
+                    alarmActive = true;
+                    audioPromise = audio.play();
+                    audioPromise.catch(e => {
+                        if (e.name !== 'AbortError') {
+                            console.log("Audio play failed:", e);
+                        }
+                    });
+                    if (mainHeader) mainHeader.classList.add('bg-red-900/40', 'animate-pulse');
+                    const notifIcon = document.querySelector('header .material-symbols-outlined');
+                    if (notifIcon) notifIcon.classList.add('text-red-500', 'animate-bounce');
+                }
+            } else {
+                if (alarmActive) {
+                    alarmActive = false;
+                    const stopAudio = () => {
+                        audio.pause();
+                        audio.currentTime = 0;
+                    };
+
+                    if (audioPromise && audioPromise.then) {
+                        audioPromise.then(stopAudio).catch(stopAudio);
+                    } else {
+                        stopAudio();
+                    }
+
+                    if (mainHeader) mainHeader.classList.remove('bg-red-900/40', 'animate-pulse');
+                    const notifIcon = document.querySelector('header .material-symbols-outlined');
+                    if (notifIcon) notifIcon.classList.remove('text-red-500', 'animate-bounce');
+                }
+            }
+        }
+
+        function saveAlarmSettings(btn) {
+            const autoSave = document.getElementById('toggle-db-save').checked;
+            const logInterval = parseInt(document.getElementById('range-db-interval').value);
+
+            alarmSettings = {
+                vHigh: parseFloat(document.getElementById('range-v-high').value),
+                vLow: parseFloat(document.getElementById('range-v-low').value),
+                cHigh: parseFloat(document.getElementById('range-c-high').value),
+                pHigh: parseFloat(document.getElementById('range-p-high').value),
+                vHighEnabled: document.getElementById('toggle-v-high').checked,
+                vLowEnabled: document.getElementById('toggle-v-low').checked,
+                cHighEnabled: document.getElementById('toggle-c-high').checked,
+                pHighEnabled: document.getElementById('toggle-p-high').checked,
+                soundUrl: document.getElementById('alarm-sound-select').value,
+                autoSave: autoSave,
+                logInterval: logInterval
+            };
+
+            localStorage.setItem('elban_alarm_settings', JSON.stringify(alarmSettings));
+
+            // Sync with Device Config as well
+            const deviceConfig = JSON.parse(localStorage.getItem('elban_device_config') || '{}');
+            deviceConfig.autoSave = autoSave;
+            deviceConfig.logInterval = logInterval;
+            localStorage.setItem('elban_device_config', JSON.stringify(deviceConfig));
+
+            // Sync MQTT Bridge
+            if (client && client.isConnected()) {
+                console.log(`📤 Sending DB Config to MQTT: Auto-Save=${autoSave}, Interval=${logInterval}s`);
+                client.send("elban/config/autosave", autoSave ? "1" : "0", 1, true);
+                client.send("elban/config/log_interval", logInterval.toString(), 1, true);
+            } else {
+                console.warn("⚠️ MQTT not connected. Config saved locally but not synced to bridge.");
+            }
+
+            // Update Device Tab UI if elements exist
+            const uiLogInt = document.getElementById('ui-log-interval');
+            const uiSaveStatus = document.getElementById('ui-auto-save-status');
+            if (uiLogInt) uiLogInt.innerText = logInterval + "s";
+            if (uiSaveStatus) {
+                uiSaveStatus.innerText = autoSave ? "ENABLED" : "DISABLED";
+                uiSaveStatus.className = `text-xs font-bold ${autoSave ? 'text-emerald-500' : 'text-slate-500'} mt-1`;
+            }
+
+            // Visual feedback
+            const saveBtn = btn || document.querySelector('#alarm-section button[onclick*="saveAlarmSettings"]');
+            const originalHTML = saveBtn.innerHTML;
+            saveBtn.innerHTML = `<span class="material-icons">check_circle</span> <span>Settings Saved</span>`;
+            saveBtn.classList.replace('bg-primary', 'bg-emerald-600');
+
+            setTimeout(() => {
+                saveBtn.innerHTML = originalHTML;
+                saveBtn.classList.replace('bg-emerald-600', 'bg-primary');
+            }, 2000);
+        }
+
+        function loadAlarmSettings() {
+            const saved = localStorage.getItem('elban_alarm_settings');
+            if (saved) {
+                alarmSettings = JSON.parse(saved);
+
+                // Update UI Controls
+                const rVHigh = document.getElementById('range-v-high');
+                const rVLow = document.getElementById('range-v-low');
+                const rPHigh = document.getElementById('range-p-high');
+
+                if (rVHigh) {
+                    rVHigh.value = alarmSettings.vHigh;
+                    document.getElementById('num-v-high').value = alarmSettings.vHigh;
+                    document.getElementById('toggle-v-high').checked = alarmSettings.vHighEnabled;
+                }
+
+                if (rVLow) {
+                    rVLow.value = alarmSettings.vLow;
+                    document.getElementById('num-v-low').value = alarmSettings.vLow;
+                    document.getElementById('toggle-v-low').checked = alarmSettings.vLowEnabled;
+                }
+
+                const rCHigh = document.getElementById('range-c-high');
+                if (rCHigh) {
+                    rCHigh.value = alarmSettings.cHigh || 10;
+                    document.getElementById('num-c-high').value = alarmSettings.cHigh || 10;
+                    document.getElementById('toggle-c-high').checked = alarmSettings.cHighEnabled !== undefined ? alarmSettings.cHighEnabled : true;
+                }
+
+                if (rPHigh) {
+                    rPHigh.value = alarmSettings.pHigh;
+                    document.getElementById('num-p-high').value = alarmSettings.pHigh;
+                    document.getElementById('toggle-p-high').checked = alarmSettings.pHighEnabled;
+                }
+
+                if (alarmSettings.autoSave !== undefined) {
+                    document.getElementById('toggle-db-save').checked = alarmSettings.autoSave;
+                    document.getElementById('range-db-interval').value = alarmSettings.logInterval || 10;
+                    document.getElementById('num-db-interval').value = alarmSettings.logInterval || 10;
+                }
+
+                if (alarmSettings.soundUrl) {
+                    const soundSelect = document.getElementById('alarm-sound-select');
+                    if (soundSelect) soundSelect.value = alarmSettings.soundUrl;
+                    const audio = document.getElementById('alarm-audio');
+                    if (audio) audio.src = alarmSettings.soundUrl;
+                }
+            }
+        }
+
+        // loadAlarmSettings() moved to initialization sequence below
+
+        function updateUI(data) {
+            if (data.voltage === undefined) return;
+
+            // Update Voltage Text & Gauge
+            document.getElementById('voltage-display').innerText = data.voltage.toFixed(1);
+
+            const maxVoltage = 250;
+            const percentageV = Math.min(data.voltage / maxVoltage, 1);
+            const offsetV = 330 - (percentageV * 330);
+            document.getElementById('gauge-fill-path').style.strokeDashoffset = offsetV;
+
+            // Update Main Monitoring Cards
+            if (data.current !== undefined) document.getElementById('current-main-display').innerText = parseFloat(data.current).toFixed(2);
+            if (data.energy !== undefined) document.getElementById('energy-main-display').innerText = parseFloat(data.energy).toFixed(3);
+            if (data.frequency !== undefined) document.getElementById('freq-main-display').innerText = parseFloat(data.frequency).toFixed(1);
+            if (data.pf !== undefined) document.getElementById('pf-main-display').innerText = parseFloat(data.pf).toFixed(2);
+
+            // Update Graph History Data
+            if (data.current !== undefined) {
+                currentDataPoints.push(parseFloat(data.current));
+                if (currentDataPoints.length > MAX_POINTS) currentDataPoints.shift();
+                drawCurrentGraph();
+            }
+            if (data.power !== undefined) {
+                powerDataPoints.push(parseFloat(data.power));
+                if (powerDataPoints.length > MAX_POINTS) powerDataPoints.shift();
+                drawPowerGraph();
+            }
+
+            // Update Device Info Details
+            document.getElementById('dev-voltage').innerHTML = `${data.voltage.toFixed(1)} <span class="text-xs text-slate-400 font-normal">V</span>`;
+            if (data.current !== undefined)
+                document.getElementById('dev-current').innerHTML = `${parseFloat(data.current).toFixed(2)} <span class="text-xs text-slate-400 font-normal">A</span>`;
+
+            if (data.power !== undefined) {
+                document.getElementById('dev-power').innerHTML = `${parseFloat(data.power).toFixed(1)} <span class="text-xs text-slate-400 font-normal">W</span>`;
+                const pwrEl = document.getElementById('power-display');
+                if (pwrEl) pwrEl.innerText = `Power: ${data.power.toFixed(1)} W`;
+            }
+            if (data.energy !== undefined)
+                document.getElementById('dev-energy').innerHTML = `${parseFloat(data.energy).toFixed(3)} <span class="text-xs text-slate-400 font-normal">kWh</span>`;
+
+            if (data.frequency !== undefined) {
+                document.getElementById('dev-frequency').innerHTML = `${parseFloat(data.frequency).toFixed(2)} <span class="text-xs text-slate-400 font-normal">Hz</span>`;
+                const freqEl = document.getElementById('frequency-display');
+                if (freqEl) freqEl.innerText = `Frequency: ${data.frequency.toFixed(2)} Hz`;
+            }
+            if (data.pf !== undefined) {
+                document.getElementById('dev-pf').innerText = parseFloat(data.pf).toFixed(2);
+                const pfEl = document.getElementById('pf-display');
+                if (pfEl) pfEl.innerText = `PF: ${parseFloat(data.pf).toFixed(2)}`;
+            }
+
+            // Alarm Checking Logic
+            let isViolation = false;
+            let violationReason = "";
+
+            if (alarmSettings.vHighEnabled && data.voltage > alarmSettings.vHigh) {
+                isViolation = true;
+                violationReason = `High Voltage: ${data.voltage.toFixed(1)}V`;
+            } else if (alarmSettings.vLowEnabled && data.voltage < alarmSettings.vLow) {
+                isViolation = true;
+                violationReason = `Low Voltage: ${data.voltage.toFixed(1)}V`;
+            } else if (alarmSettings.cHighEnabled && data.current !== undefined && data.current > alarmSettings.cHigh) {
+                isViolation = true;
+                violationReason = `High Current: ${data.current.toFixed(2)}A`;
+            } else if (alarmSettings.pHighEnabled && data.power !== undefined && data.power > alarmSettings.pHigh) {
+                isViolation = true;
+                violationReason = `Power Overload: ${parseFloat(data.power).toFixed(0)}W`;
+            }
+
+            triggerAlarm(isViolation, violationReason);
+
+            // Status Calculation for Log
+            let statusText = isViolation ? "CRITICAL" : "NORMAL";
+            let borderColor = isViolation ? "red-500" : "emerald-500";
+
+            // Update timestamp
+            const now = new Date();
+            document.getElementById('last-updated').innerText = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+
+            // Simpan ke Log History
+            addToLog(data.voltage, statusText, borderColor, null, false, data);
+        }
+
+        function drawCurrentGraph() {
+            const line = document.getElementById('graph-line-path');
+            const area = document.getElementById('graph-area-path');
+            const cursor = document.getElementById('graph-cursor');
+            const glow = document.getElementById('graph-cursor-glow');
+            const yMaxLabel = document.getElementById('graph-y-max');
+
+            if (!line || currentDataPoints.length < 2) return;
+
+            const width = 400;
+            const height = 240;
+            const maxVal = Math.max(...currentDataPoints, 1); // Minimum 1A for scale
+            if (yMaxLabel) yMaxLabel.innerText = maxVal.toFixed(1) + "A";
+
+            let pathData = "";
+            const step = width / (MAX_POINTS - 1);
+
+            currentDataPoints.forEach((val, i) => {
+                const x = (MAX_POINTS - currentDataPoints.length + i) * step;
+                const y = height - (val / maxVal * (height - 60)) - 40;
+
+                if (i === 0) pathData += `M ${x},${y}`;
+                else pathData += ` L ${x},${y}`;
+
+                if (i === currentDataPoints.length - 1) {
+                    if (cursor) {
+                        cursor.setAttribute("cx", x);
+                        cursor.setAttribute("cy", y);
+                        cursor.style.display = "block";
+                    }
+                    if (glow) {
+                        glow.setAttribute("cx", x);
+                        glow.setAttribute("cy", y);
+                        glow.style.display = "block";
+                    }
+                }
+            });
+
+            line.setAttribute("d", pathData);
+            if (area) area.setAttribute("d", pathData + ` L 400,240 L 0,240 Z`);
+        }
+
+        function drawPowerGraph() {
+            const line = document.getElementById('power-graph-line-path');
+            const area = document.getElementById('power-graph-area-path');
+            const cursor = document.getElementById('power-graph-cursor');
+            const yMaxLabel = document.getElementById('power-graph-y-max');
+
+            if (!line || powerDataPoints.length < 2) return;
+
+            const width = 400;
+            const height = 240;
+            const maxVal = Math.max(...powerDataPoints, 10); // Minimum 10W for scale
+            if (yMaxLabel) yMaxLabel.innerText = Math.round(maxVal) + "W";
+
+            let pathData = "";
+            const step = width / (MAX_POINTS - 1);
+
+            powerDataPoints.forEach((val, i) => {
+                const x = (MAX_POINTS - powerDataPoints.length + i) * step;
+                const y = height - (val / maxVal * (height - 60)) - 40;
+
+                if (i === 0) pathData += `M ${x},${y}`;
+                else pathData += ` L ${x},${y}`;
+
+                if (i === powerDataPoints.length - 1) {
+                    if (cursor) {
+                        cursor.setAttribute("cx", x);
+                        cursor.setAttribute("cy", y);
+                        cursor.style.display = "block";
+                    }
+                }
+            });
+
+            line.setAttribute("d", pathData);
+            if (area) area.setAttribute("d", pathData + ` L 400,240 L 0,240 Z`);
+        }
+
+        // --- History Logic ---
+        let lastAutoSaveTime = 0;
+        function addToLog(voltage, status, borderColor, customDate = null, isBulkLoad = false, rawData = null) {
+            const now = customDate || new Date();
+            const time = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+            const date = now.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+
+            const logItem = {
+                time: time, date: date, voltage: voltage.toFixed(1),
+                status: status, borderColor: borderColor
+            };
+
+            if (isBulkLoad) {
+                historyLogs.push(logItem);
+            } else {
+                // Real-time update only for mini-view
+                realtimeLogs.unshift(logItem);
+                if (realtimeLogs.length > 5) realtimeLogs.pop();
+                updateLogUI();
+
+                // Handle Persistence to LocalStorage (Browser-side Auto Save)
+                if (rawData && alarmSettings.autoSave) {
+                    const intervalMs = (alarmSettings.logInterval || 10) * 1000;
+                    if (now.getTime() - lastAutoSaveTime >= intervalMs) {
+                        const historyEntry = {
+                            timestamp: now.toISOString(),
+                            voltage: rawData.voltage,
+                            current: rawData.current,
+                            power: rawData.power,
+                            energy: rawData.energy
+                        };
+
+                        persistentHistory.push(historyEntry);
+                        // Clip history if exceeds limit
+                        if (persistentHistory.length > MAX_HISTORY_ITEMS) {
+                            persistentHistory.shift();
+                        }
+
+                        localStorage.setItem('elban_sensor_history', JSON.stringify(persistentHistory));
+                        lastAutoSaveTime = now.getTime();
+                        console.log("💾 [LOCAL SAVE] Data stored in browser storage");
+                    }
+                }
+            }
+        }
+
+        function loadHistoryFromLocalStorage() {
+            const savedHistory = localStorage.getItem('elban_sensor_history');
+            if (savedHistory) {
+                persistentHistory = JSON.parse(savedHistory);
+                historyLogs = []; // Clear previous historyLogs
+                persistentHistory.forEach(entry => {
+                    const now = new Date(entry.timestamp);
+                    const isViolation = (alarmSettings.vHighEnabled && entry.voltage > alarmSettings.vHigh) ||
+                        (alarmSettings.vLowEnabled && entry.voltage < alarmSettings.vLow) ||
+                        (alarmSettings.cHighEnabled && entry.current !== undefined && entry.current > alarmSettings.cHigh) ||
+                        (alarmSettings.pHighEnabled && entry.power !== undefined && entry.power > alarmSettings.pHigh);
+                    const statusText = isViolation ? "CRITICAL" : "NORMAL";
+                    const borderColor = isViolation ? "red-500" : "emerald-500";
+                    addToLog(entry.voltage, statusText, borderColor, now, true); // Use true for isBulkLoad
+                });
+                updateLogUI();
+            }
+        }
+
+        function exportHistoryToCSV() {
+            if (persistentHistory.length === 0) {
+                alert("No history data to export.");
+                return;
+            }
+
+            const headers = ["Timestamp", "Voltage (V)", "Current (A)", "Power (W)", "Energy (kWh)"];
+            const csvRows = [];
+            csvRows.push(headers.join(','));
+
+            persistentHistory.forEach(entry => {
+                const row = [
+                    entry.timestamp,
+                    entry.voltage !== undefined ? entry.voltage.toFixed(2) : '',
+                    entry.current !== undefined ? entry.current.toFixed(2) : '',
+                    entry.power !== undefined ? entry.power.toFixed(2) : '',
+                    entry.energy !== undefined ? entry.energy.toFixed(3) : ''
+                ];
+                csvRows.push(row.join(','));
+            });
+
+            const csvString = csvRows.join('\n');
+            const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            if (link.download !== undefined) { // feature detection
+                const url = URL.createObjectURL(blob);
+                link.setAttribute('href', url);
+                link.setAttribute('download', 'elban_sensor_history.csv');
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            } else {
+                alert("Your browser does not support downloading files directly. Please copy the data manually.");
+            }
+        }
+
+        function updateLogUI() {
+            const mainList = document.getElementById('history-log-list');
+            const miniList = document.getElementById('mini-log-list');
+
+            const logHTML = (logs) => logs.map(log => `
+                <div class="glass-panel p-4 rounded-xl flex items-center justify-between border-l-4 border-${log.borderColor}">
+                    <div class="w-1/3">
+                        <p class="text-xs font-bold text-white">${log.time}</p>
+                        <p class="text-[9px] text-slate-500 font-medium">${log.date}</p>
+                    </div>
+                    <div class="w-1/3 text-center">
+                        <p class="text-sm font-bold text-white">${log.voltage} <span class="text-[10px] text-slate-500 font-normal">V</span></p>
+                    </div>
+                    <div class="w-1/3 flex justify-end">
+                        <span class="px-3 py-1 bg-${log.borderColor}/10 rounded-full border border-${log.borderColor}/20 text-[9px] font-bold text-${log.borderColor}">${log.status}</span>
+                    </div>
+                </div>
+            `).join('');
+
+            if (mainList) {
+                // Main history tab ONLY shows results from database queries
+                mainList.innerHTML = logHTML(historyLogs);
+            }
+
+            if (miniList) {
+                // Mini-view in Monitoring tab ONLY shows real-time updates
+                miniList.innerHTML = logHTML(realtimeLogs);
+            }
+        }
+
+        // --- Device Settings Logic ---
+        function toggleDeviceEdit() {
+            const vMode = document.getElementById('device-view-mode');
+            const eMode = document.getElementById('device-edit-mode');
+            const icon = document.getElementById('device-edit-icon');
+
+            if (!vMode || !eMode) return;
+
+            if (vMode.classList.contains('hidden')) {
+                vMode.classList.remove('hidden');
+                eMode.classList.add('hidden');
+                if (icon) icon.innerText = "edit";
+            } else {
+                const config = JSON.parse(localStorage.getItem('elban_device_config') || '{}');
+                const editSave = document.getElementById('edit-auto-save');
+                if (editSave) editSave.checked = config.autoSave !== false;
+
+                vMode.classList.add('hidden');
+                eMode.classList.remove('hidden');
+                if (icon) icon.innerText = "close";
+            }
+        }
+
+        function saveDeviceConfig(btn) {
+            const getVal = (id) => document.getElementById(id)?.value || "";
+            const setUI = (id, val) => {
+                const el = document.getElementById(id);
+                if (el) el.innerText = val;
+            };
+
+            const name = getVal('edit-device-name');
+            const broker = getVal('edit-broker');
+            const topic = getVal('edit-topic');
+            const port = getVal('edit-port');
+            const interval = getVal('edit-interval');
+            const logInterval = getVal('edit-log-interval');
+            const autoSave = document.getElementById('edit-auto-save')?.checked ?? true;
+
+            // Update UI
+            setUI('ui-device-name', name);
+            setUI('ui-broker', broker);
+            setUI('ui-topic', topic);
+            setUI('ui-port', port + " (WS)");
+            setUI('ui-interval', interval + "s");
+            setUI('ui-log-interval', logInterval + "s");
+
+            const uiSaveStatus = document.getElementById('ui-auto-save-status');
+            if (uiSaveStatus) {
+                uiSaveStatus.innerText = autoSave ? "ENABLED" : "DISABLED";
+                uiSaveStatus.className = `text-xs font-bold ${autoSave ? 'text-emerald-500' : 'text-slate-500'} mt-1`;
+            }
+
+            // Persist locally for the session
+            const config = { name, broker, topic, port, interval, logInterval, autoSave };
+            localStorage.setItem('elban_device_config', JSON.stringify(config));
+
+            // Publish config to MQTT for the bridge
+            if (client && client.isConnected()) {
+                console.log(`📤 Sending Device Config to MQTT...`);
+                client.send("elban/config/autosave", autoSave ? "1" : "0", 1, true);
+                client.send("elban/config/log_interval", logInterval.toString(), 1, true);
+            } else {
+                console.warn("⚠️ MQTT not connected. Config saved locally but not synced to bridge.");
+            }
+
+            // Visual feedback
+            const saveBtn = btn || event?.target;
+            if (saveBtn) {
+                const originalText = saveBtn.innerText;
+                saveBtn.innerText = "Saved!";
+                const prevBg = saveBtn.classList.contains('bg-primary') ? 'bg-primary' : 'bg-slate-700';
+                saveBtn.classList.remove(prevBg);
+                saveBtn.classList.add('bg-healthy');
+
+                setTimeout(() => {
+                    saveBtn.innerText = originalText;
+                    saveBtn.classList.remove('bg-healthy');
+                    saveBtn.classList.add(prevBg);
+                    toggleDeviceEdit();
+                }, 1000);
+            } else {
+                toggleDeviceEdit();
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            const setUI = (id, val) => {
+                const el = document.getElementById(id);
+                if (el) el.innerText = val;
+            };
+
+            const saved = localStorage.getItem('elban_device_config');
+            if (saved) {
+                const config = JSON.parse(saved);
+                setUI('ui-device-name', config.name);
+                setUI('ui-broker', config.broker);
+                setUI('ui-topic', config.topic);
+                setUI('ui-port', config.port + " (WS)");
+                setUI('ui-interval', config.interval + "s");
+                setUI('ui-log-interval', (config.logInterval || 10) + "s");
+
+                const autoSave = config.autoSave !== false;
+                const uiSaveStatus = document.getElementById('ui-auto-save-status');
+                if (uiSaveStatus) {
+                    uiSaveStatus.innerText = autoSave ? "ENABLED" : "DISABLED";
+                    uiSaveStatus.className = `text-xs font-bold ${autoSave ? 'text-emerald-500' : 'text-slate-500'} mt-1`;
+                }
+
+                const editSave = document.getElementById('edit-auto-save');
+                if (editSave) editSave.checked = autoSave;
+
+                // Update inputs
+                const setVal = (id, val) => {
+                    const el = document.getElementById(id);
+                    if (el) el.value = val;
+                };
+                setVal('edit-device-name', config.name);
+                setVal('edit-broker', config.broker);
+                setVal('edit-topic', config.topic);
+                setVal('edit-port', config.port);
+                setVal('edit-interval', config.interval);
+                setVal('edit-log-interval', config.logInterval || 10);
+            }
+
+            // --- Initialization sequence ---
+            loadAlarmSettings();
+
+            // MQTT Subscriptions & Callbacks
+            client.onConnectionLost = onConnectionLost;
+            client.onMessageArrived = onMessageArrived;
+            connectToBroker();
+
+            // Initial Data Load
+            loadHistoryFromDB('latest', 1);
+        });
+
+        function showSection(section) {
+            const monitorSec = document.getElementById('monitoring-section');
+            const historySec = document.getElementById('history-section');
+            const alarmSec = document.getElementById('alarm-section');
+            const deviceSec = document.getElementById('device-section');
+
+            const mainHeader = document.getElementById('main-header');
+            const historyHeader = document.getElementById('history-header');
+            const alarmHeader = document.getElementById('alarm-header');
+            const deviceHeader = document.getElementById('device-header');
+
+            const navMonitor = document.getElementById('nav-monitor');
+            const navHistory = document.getElementById('nav-history');
+            const navAlarm = document.getElementById('nav-alarm');
+            const navDevice = document.getElementById('nav-device');
+
+            // Hide everything first
+            [monitorSec, historySec, alarmSec, deviceSec,
+                mainHeader, historyHeader, alarmHeader, deviceHeader].forEach(el => {
+                    if (el) el.classList.add('hidden');
+                });
+
+            // Remove active styles from all nav buttons
+            [navMonitor, navHistory, navAlarm, navDevice].forEach(nav => {
+                if (!nav) return;
+                const icons = nav.querySelectorAll('span');
+                icons.forEach(icon => {
+                    icon.classList.remove('text-primary', 'scale-110');
+                    icon.classList.add('text-slate-500');
+                });
+            });
+
+            if (section === 'history') {
+                if (historySec) historySec.classList.remove('hidden');
+                if (historyHeader) historyHeader.classList.remove('hidden');
+                setNavActive(navHistory);
+                loadHistoryFromDB('latest', 1); // Trigger DB reload with first page
+            } else if (section === 'alarm') {
+                if (alarmSec) alarmSec.classList.remove('hidden');
+                if (alarmHeader) alarmHeader.classList.remove('hidden');
+                setNavActive(navAlarm);
+            } else if (section === 'device') {
+                if (deviceSec) deviceSec.classList.remove('hidden');
+                if (deviceHeader) deviceHeader.classList.remove('hidden');
+                setNavActive(navDevice);
+            } else {
+                if (monitorSec) monitorSec.classList.remove('hidden');
+                if (mainHeader) mainHeader.classList.remove('hidden');
+                setNavActive(navMonitor);
+            }
+        }
+
+        function setNavActive(navElement) {
+            if (!navElement) return;
+            const icons = navElement.querySelectorAll('span');
+            icons.forEach((icon, index) => {
+                icon.classList.remove('text-slate-500');
+                icon.classList.add('text-primary');
+                if (index === 0) icon.classList.add('scale-110');
+            });
+        }
+
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voltage Sensor Simulator Controller</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"
+        type="text/javascript"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎮</text></svg>">
+    <style>
+        body {
+            background-color: #0f172a;
+            color: #f8fafc;
+            font-family: sans-serif;
+        }
+
+        .glass {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        input[type=range] {
+            accent-color: #3b82f6;
+        }
+    </style>
+</head>
+
+<body class="min-h-screen flex items-center justify-center p-6">
+    <div class="max-w-md w-full glass rounded-3xl p-8 shadow-2xl">
+        <div class="flex items-center justify-between mb-8">
+            <h1 class="text-2xl font-bold text-blue-400">Simulator Controller</h1>
+            <div id="status-dot" class="w-3 h-3 rounded-full bg-red-500"></div>
+        </div>
+
+        <div class="space-y-8">
+            <!-- Connection Info -->
+            <div class="bg-blue-500/10 border border-blue-500/20 p-4 rounded-xl">
+                <p class="text-xs text-blue-300 font-bold uppercase tracking-widest mb-1">Status</p>
+                <p id="status-text" class="text-sm font-medium">Connecting to Broker...</p>
+            </div>
+
+            <!-- Voltage Control -->
+            <div>
+                <div class="flex justify-between items-end mb-4">
+                    <p class="text-sm font-bold uppercase tracking-wider text-slate-400">Voltage (Volts)</p>
+                    <p id="voltage-val" class="text-4xl font-black text-white">220.0</p>
+                </div>
+                <input type="range" id="voltage-slider" min="0" max="300" step="0.5" value="220"
+                    class="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer">
+                <div class="flex justify-between mt-2 text-[10px] font-bold text-slate-500 uppercase">
+                    <span>0V</span>
+                    <span>150V</span>
+                    <span>300V</span>
+                </div>
+            </div>
+
+            <!-- Frequency Control -->
+            <div>
+                <div class="flex justify-between items-end mb-4">
+                    <p class="text-sm font-bold uppercase tracking-wider text-slate-400">Frequency (Hz)</p>
+                    <p id="freq-val" class="text-2xl font-black text-white">50.00</p>
+                </div>
+                <input type="range" id="freq-slider" min="45" max="55" step="0.01" value="50.00"
+                    class="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer">
+            </div>
+
+            <!-- Quick Presets -->
+            <div class="grid grid-cols-3 gap-3">
+                <button onclick="setPreset(180)"
+                    class="bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 py-2 rounded-lg text-[10px] font-bold text-red-400 uppercase">Low
+                    Voltage</button>
+                <button onclick="setPreset(220)"
+                    class="bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/30 py-2 rounded-lg text-[10px] font-bold text-emerald-400 uppercase">Normal</button>
+                <button onclick="setPreset(250)"
+                    class="bg-orange-500/20 hover:bg-orange-500/30 border border-orange-500/30 py-2 rounded-lg text-[10px] font-bold text-orange-400 uppercase">High
+                    Voltage</button>
+            </div>
+
+            <!-- Auto Mode Toggle -->
+            <div class="flex items-center justify-between pt-4 border-t border-slate-700/50">
+                <div>
+                    <p class="text-sm font-bold">Auto-Publish Data</p>
+                    <p class="text-[10px] text-slate-400 uppercase tracking-tighter">Sends data every 2 seconds</p>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" id="auto-toggle" class="sr-only peer" checked>
+                    <div
+                        class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600">
+                    </div>
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const MQTT_BROKER = "broker.hivemq.com";
+        const MQTT_PORT = 8000;
+        const TOPIC_DATA = "elban/upg/sensor_data_unique_3c5d";
+        const TOPIC_STATUS = "elban/upg/status_unique_3c5d";
+        const CLIENT_ID = "ELBAN_SIM_CTRL_" + Math.random().toString(16).substr(2, 5);
+
+        const client = new Paho.MQTT.Client(MQTT_BROKER, MQTT_PORT, "/mqtt", CLIENT_ID);
+        let isConnected = false;
+        let autoInterval = null;
+
+        client.onConnectionLost = (resp) => {
+            isConnected = false;
+            updateStatusUI(false);
+            if (resp.errorCode !== 0) {
+                document.getElementById('status-text').innerText = "Error: " + resp.errorMessage;
+            }
+        };
+
+        client.connect({
+            onSuccess: () => {
+                isConnected = true;
+                updateStatusUI(true);
+                client.publish(TOPIC_STATUS, "online", 1, true);
+                startAutoPublish();
+            },
+            onFailure: (err) => {
+                document.getElementById('status-text').innerText = "Connect Failed: " + JSON.stringify(err);
+                console.error(err);
+                updateStatusUI(false);
+            },
+            useSSL: false,
+            reconnect: true,
+            timeout: 10
+        });
+
+        function updateStatusUI(connected) {
+            const dot = document.getElementById('status-dot');
+            const txt = document.getElementById('status-text');
+            dot.className = connected ? "w-3 h-3 rounded-full bg-emerald-500 animate-pulse" : "w-3 h-3 rounded-full bg-red-500";
+            txt.innerText = connected ? "Connected to Broker" : "Disconnected / Connecting...";
+        }
+
+        const vSlider = document.getElementById('voltage-slider');
+        const vVal = document.getElementById('voltage-val');
+        const fSlider = document.getElementById('freq-slider');
+        const fVal = document.getElementById('freq-val');
+        const autoToggle = document.getElementById('auto-toggle');
+
+        function sendData() {
+            if (!isConnected) return;
+            const voltage = parseFloat(vSlider.value);
+            const frequency = parseFloat(fSlider.value);
+
+            const payload = JSON.stringify({
+                voltage: voltage,
+                current: (voltage / 100).toFixed(2), // dummy current
+                power: (voltage * 1.5).toFixed(1),   // dummy power
+                energy: 12.45,                       // static for sim
+                frequency: frequency,
+                pf: 0.98
+            });
+
+            const message = new Paho.MQTT.Message(payload);
+            message.destinationName = TOPIC_DATA;
+            client.send(message);
+            console.log("Sent:", payload);
+        }
+
+        function startAutoPublish() {
+            if (autoInterval) clearInterval(autoInterval);
+            autoInterval = setInterval(() => {
+                if (autoToggle.checked) sendData();
+            }, 2000);
+        }
+
+        vSlider.oninput = () => {
+            vVal.innerText = parseFloat(vSlider.value).toFixed(1);
+            if (!autoToggle.checked) sendData();
+        };
+
+        fSlider.oninput = () => {
+            fVal.innerText = parseFloat(fSlider.value).toFixed(2);
+            if (!autoToggle.checked) sendData();
+        };
+
+        function setPreset(val) {
+            vSlider.value = val;
+            vVal.innerText = val.toFixed(1);
+            sendData();
+        }
+
+        autoToggle.onchange = () => {
+            if (autoToggle.checked) startAutoPublish();
+            else if (autoInterval) clearInterval(autoInterval);
+        };
+    </script>
+</body>
+
+</html>
