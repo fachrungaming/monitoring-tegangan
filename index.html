@@ -1009,7 +1009,7 @@
 
         // MQTT Configuration
         const MQTT_BROKER = "broker.hivemq.com";
-        const MQTT_PORT = 8000;
+        const MQTT_PORT = 8884;
         const MQTT_TOPIC_DATA = "elban/voltage/data";
         const MQTT_TOPIC_STATUS = "elban/status";
         const CLIENT_ID = "ELBAN_DASHBOARD_" + Math.random().toString(16).substr(2, 8);
@@ -1024,8 +1024,10 @@
                     console.error(err);
                     setTimeout(connectToBroker, 5000);
                 },
-                useSSL: false,
-                timeout: 10
+                useSSL: true, // WAJIB TRUE agar bisa berjalan di GitHub Pages (HTTPS)
+                timeout: 10,
+                keepAliveInterval: 30,
+                cleanSession: true
             });
         }
 
